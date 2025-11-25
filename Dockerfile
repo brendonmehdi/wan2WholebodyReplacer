@@ -47,7 +47,7 @@ RUN cd /ComfyUI/custom_nodes && \
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/kijai/ComfyUI-segment-anything-2.git && \
     cd ComfyUI-segment-anything-2 && \
-    pip install -r requirements.txt
+    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
 
 RUN cd /ComfyUI/custom_nodes && \
