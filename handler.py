@@ -15,6 +15,17 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Import and run model downloader
+try:
+    from download_models import check_and_download_models
+    check_and_download_models()
+except ImportError:
+    logger.warning("download_models.py not found, skipping runtime model download.")
+except Exception as e:
+    logger.error(f"Failed to download models: {e}")
+    # We might want to raise here if models are critical, but for now let's log and proceed
+    # raise e 
+
 
 server_address = os.getenv('SERVER_ADDRESS', '127.0.0.1')
 client_id = str(uuid.uuid4())
