@@ -49,6 +49,11 @@ RUN cd /ComfyUI/custom_nodes && \
     cd ComfyUI-segment-anything-2 && \
     if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
+RUN cd /ComfyUI/custom_nodes && \
+    git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git && \
+    cd comfyui_controlnet_aux && \
+    pip install -r requirements.txt
+
 
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/eddyhhlure1Eddy/IntelligentVRAMNode && \
