@@ -84,6 +84,15 @@ def download_file_from_url(url, output_path):
 def save_base64_to_file(base64_data, temp_dir, output_filename):
     """Base64 데이터를 파일로 저장하는 함수"""
     try:
+        # Remove data URI prefix if present
+        if ',' in base64_data:
+            base64_data = base64_data.split(',')[1]
+            
+        # Add padding if needed
+        missing_padding = len(base64_data) % 4
+        if missing_padding:
+            base64_data += '=' * (4 - missing_padding)
+            
         # Base64 문자열 디코딩
         decoded_data = base64.b64decode(base64_data)
         
