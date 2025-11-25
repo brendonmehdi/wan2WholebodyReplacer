@@ -44,6 +44,11 @@ RUN cd /ComfyUI/custom_nodes && \
     cd ComfyUI-WanVideoWrapper && \
     pip install -r requirements.txt
 
+RUN cd /ComfyUI/custom_nodes && \
+    git clone https://github.com/kijai/ComfyUI-SAM2.git && \
+    cd ComfyUI-SAM2 && \
+    pip install -r requirements.txt
+
 
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/eddyhhlure1Eddy/IntelligentVRAMNode && \
