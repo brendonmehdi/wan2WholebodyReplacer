@@ -5,6 +5,10 @@ set -e
 
 # Start ComfyUI in the background
 echo "Starting ComfyUI in the background..."
+echo "DEBUG: Listing /workspace/models content:"
+ls -R /workspace/models || echo "/workspace/models not found or empty"
+echo "DEBUG: Listing /ComfyUI/models content:"
+ls -R /ComfyUI/models || echo "/ComfyUI/models not found or empty"
 python /ComfyUI/main.py --listen --use-sage-attention &
 
 # Wait for ComfyUI to be ready
