@@ -63,12 +63,13 @@ RUN cd /ComfyUI/custom_nodes && \
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git && \
     cd ComfyUI-Frame-Interpolation && \
-    pip install -r requirements.txt
+    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && \
+    if [ -f requirements-no-cupy.txt ]; then pip install -r requirements-no-cupy.txt; fi
 
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/rgthree/rgthree-comfy.git && \
     cd rgthree-comfy && \
-    pip install -r requirements.txt
+    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
 RUN pip install onnx onnxruntime
 
