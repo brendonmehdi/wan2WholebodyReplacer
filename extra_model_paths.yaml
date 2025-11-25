@@ -3,20 +3,30 @@
 
 comfyui:
     base_path: /ComfyUI/
-    # You can use is_default to mark that these folders should be listed first, and used as the default dirs for eg downloads
-    is_default: true
+    is_default: false
     checkpoints: models/checkpoints/
     clip: models/clip/
     clip_vision: models/clip_vision/
     configs: models/configs/
     controlnet: models/controlnet/
-    diffusion_models: |
-        models/diffusion_models
-        models/unet
-        /runpod-volume/models/
+    diffusion_models: models/diffusion_models/
     embeddings: models/embeddings/
-    loras: |
-        models/loras/
-        /runpod-volume/loras/
+    loras: models/loras/
     upscale_models: models/upscale_models/
     vae: models/vae/
+
+runpod_network_storage:
+    base_path: /workspace/models
+    is_default: true
+    checkpoints: checkpoints/
+    clip: clip/
+    clip_vision: clip_vision/
+    configs: configs/
+    controlnet: controlnet/
+    diffusion_models: diffusion_models/
+    embeddings: embeddings/
+    loras: loras/
+    upscale_models: upscale_models/
+    vae: vae/
+    text_encoders: text_encoders/
+    unet: unet/
