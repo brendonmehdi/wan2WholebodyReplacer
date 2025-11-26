@@ -30,4 +30,9 @@ runpod_network_storage:
     vae: vae/
     text_encoders: text_encoders/
     unet: unet/
-    onnx: onnx/
+    onnx: detection/
+    yolo: detection/
+    vitpose: detection/
+    bbox: detection/
+    pose: detection/
+    detection: detection/
