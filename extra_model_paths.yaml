@@ -16,7 +16,7 @@ comfyui:
     vae: models/vae/
 
 runpod_network_storage:
-    base_path: /workspace/models
+    base_path: /runpod-volume/models
     is_default: true
     checkpoints: checkpoints/
     clip: clip/

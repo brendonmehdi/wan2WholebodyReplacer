@@ -5,10 +5,35 @@ set -e
 
 # Start ComfyUI in the background
 echo "Starting ComfyUI in the background..."
-echo "DEBUG: Listing /workspace/models content:"
-ls -R /workspace/models || echo "/workspace/models not found or empty"
-echo "DEBUG: Listing /ComfyUI/models content:"
-ls -R /ComfyUI/models || echo "/ComfyUI/models not found or empty"
+
+echo "DEBUG: Listing root / content:"
+ls -F /
+
+echo "DEBUG: Checking /runpod-volume..."
+if [ -d "/runpod-volume" ]; then
+    echo "/runpod-volume exists. Listing content:"
+    ls -F /runpod-volume
+else
+    echo "/runpod-volume does NOT exist."
+fi
+
+echo "Waiting for /runpod-volume/models to be available..."
+max_retries=30
+count=0
+while [ ! -d "/runpod-volume/models" ] && [ $count -lt $max_retries ]; do
+    sleep 1
+    count=$((count + 1))
+    echo "Waiting for /runpod-volume/models... ($count/$max_retries)"
+done
+
+if [ -d "/runpod-volume/models" ]; then
+    echo "/runpod-volume/models found!"
+    ls -F /runpod-volume/models
+else
+    echo "ERROR: /runpod-volume/models NOT found after waiting. Listing /runpod-volume again:"
+    ls -F /runpod-volume || echo "/runpod-volume not accessible"
+fi
+
 python /ComfyUI/main.py --listen --use-sage-attention &
 
 # Wait for ComfyUI to be ready

@@ -81,7 +81,7 @@ RUN cd /ComfyUI/custom_nodes && \
     cd ComfyUI-AdaptiveWindowSize/ComfyUI-AdaptiveWindowSize && \
     mv * ../
 
-# Models are provided via network storage mounted at /workspace/models
+# Models are provided via network storage mounted at /runpod-volume/models
 # Configured in extra_model_paths.yaml
 
 COPY . .
