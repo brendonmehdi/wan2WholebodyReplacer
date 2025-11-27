@@ -249,6 +249,44 @@ def process_job(job_input):
             prompt["464"]["inputs"]["strength_model"] = 1.0
             logger.info(f"Applied character LoRA to Node 464: {lora_name}")
 
+        # 7. Face Crop Logic (Node 432 - ImageCropByMaskAndResize)
+        # This node is bypassed in the source workflow, so we inject it dynamically if requested.
+        use_face_crop = job_input.get("use_face_crop", False)
+        if use_face_crop:
+            logger.info("Enabling Face Crop & Redress (Injecting Node 432)")
+            
+            # Create Node 432
+            prompt["432"] = {
+                "inputs": {
+                    "base_resolution": 512,
+                    "padding": 250,
+                    "min_crop_resolution": 128,
+                    "max_crop_resolution": 512,
+                    "image": [
+                        "311",
+                        0
+                    ],
+                    "mask": [
+                        "431",
+                        0
+                    ]
+                },
+                "class_type": "ImageCropByMaskAndResize",
+                "_meta": {
+                    "title": "ImageCropByMaskAndResize"
+                }
+            }
+            
+            # Reroute WanAnimateToVideo (370) to use cropped image
+            if "370" in prompt:
+                prompt["370"]["inputs"]["reference_image"] = ["432", 0]
+                logger.info("Rerouted Node 370 reference_image to Node 432")
+        else:
+            # Ensure default routing (Direct from LoadImage)
+            if "370" in prompt:
+                prompt["370"]["inputs"]["reference_image"] = ["311", 0]
+                logger.info("Face Crop disabled: Node 370 using original reference image (Node 311)")
+
     else:
         # Existing Logic for Wan2.2 / FLF2V
         workflow_file = "/new_Wan22_flf2v_api.json" if end_image_path_local else "/new_Wan22_api.json"
