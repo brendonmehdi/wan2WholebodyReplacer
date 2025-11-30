@@ -248,6 +248,10 @@ def process_job(job_input):
             prompt["464"]["inputs"]["lora_name"] = lora_name
             prompt["464"]["inputs"]["strength_model"] = 1.0
             logger.info(f"Applied character LoRA to Node 464: {lora_name}")
+        else:
+            # Disable LoRA if not provided
+            prompt["464"]["inputs"]["strength_model"] = 0.0
+            logger.info("No character LoRA provided: Disabled Node 464 (strength=0)")
 
         # 7. Face Crop Logic (Node 432 - ImageCropByMaskAndResize)
         # This node is bypassed in the source workflow, so we inject it dynamically if requested.
