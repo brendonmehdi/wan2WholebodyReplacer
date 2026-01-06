@@ -402,9 +402,10 @@ def process_job(job_input):
     finally:
         ws.close()
 
-    # Process video outputs - UPLOAD TO S3 FOR LARGE FILES
+    # Process video outputs - ALWAYS UPLOAD TO S3 when configured
+    # RunPod has ~10-20MB combined payload limit, so always use S3 for reliability
     media_outputs = []
-    MAX_BASE64_SIZE = 10 * 1024 * 1024  # 10MB threshold (RunPod limit is ~20MB)
+    ALWAYS_USE_S3 = True  # Always upload to S3 when available (base64 is unreliable)
     
     # S3 configuration (must be set as environment variables on RunPod worker)
     S3_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY_ID') or os.getenv('S3_ACCESS_KEY')
@@ -459,9 +460,9 @@ def process_job(job_input):
             
             logger.info(f"Video output: {filename}, size: {video_size / 1024 / 1024:.1f}MB")
             
-            if video_size > MAX_BASE64_SIZE and s3_client:
-                # Large file - upload to S3 and return URL
-                logger.info(f"Video size exceeds {MAX_BASE64_SIZE / 1024 / 1024:.0f}MB threshold, uploading to S3")
+            if s3_client and ALWAYS_USE_S3:
+                # Always upload to S3 when available (RunPod payload limits are unreliable)
+                logger.info(f"Uploading {filename} to S3 (ALWAYS_USE_S3 enabled)")
                 try:
                     # Decode and save to temp file
                     temp_video_path = f"/tmp/{filename}"
