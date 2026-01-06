@@ -402,9 +402,51 @@ def process_job(job_input):
     finally:
         ws.close()
 
-    # Process video outputs
+    # Process video outputs - UPLOAD TO S3 FOR LARGE FILES
     media_outputs = []
-    MAX_BASE64_SIZE = 50 * 1024 * 1024  # 50MB threshold - upload to bucket if larger
+    MAX_BASE64_SIZE = 10 * 1024 * 1024  # 10MB threshold (RunPod limit is ~20MB)
+    
+    # S3 configuration (must be set as environment variables on RunPod worker)
+    S3_ACCESS_KEY = os.getenv('AWS_ACCESS_KEY_ID') or os.getenv('S3_ACCESS_KEY')
+    S3_SECRET_KEY = os.getenv('AWS_SECRET_ACCESS_KEY') or os.getenv('S3_SECRET_KEY')
+    S3_BUCKET = os.getenv('AWS_S3_BUCKET') or os.getenv('S3_BUCKET')
+    S3_REGION = os.getenv('AWS_REGION') or os.getenv('S3_REGION', 'us-east-1')
+    S3_ENDPOINT = os.getenv('S3_ENDPOINT')  # For non-AWS S3
+    
+    s3_client = None
+    if S3_ACCESS_KEY and S3_SECRET_KEY and S3_BUCKET:
+        try:
+            import boto3
+            from botocore.config import Config
+            
+            s3_config = Config(
+                signature_version='s3v4',
+                retries={'max_attempts': 3}
+            )
+            
+            if S3_ENDPOINT:
+                s3_client = boto3.client(
+                    's3',
+                    aws_access_key_id=S3_ACCESS_KEY,
+                    aws_secret_access_key=S3_SECRET_KEY,
+                    region_name=S3_REGION,
+                    endpoint_url=S3_ENDPOINT,
+                    config=s3_config
+                )
+            else:
+                s3_client = boto3.client(
+                    's3',
+                    aws_access_key_id=S3_ACCESS_KEY,
+                    aws_secret_access_key=S3_SECRET_KEY,
+                    region_name=S3_REGION,
+                    config=s3_config
+                )
+            logger.info(f"S3 client initialized for bucket: {S3_BUCKET}")
+        except Exception as s3_init_err:
+            logger.warning(f"Failed to initialize S3 client: {s3_init_err}")
+            s3_client = None
+    else:
+        logger.warning("S3 credentials not configured - large videos may fail to return")
     
     for node_id in videos:
         if videos[node_id]:
@@ -415,9 +457,11 @@ def process_job(job_input):
             video_size = len(video_data) * 3 // 4  # Approx decoded size
             filename = f"{task_id}_{node_id}.mp4"
             
-            if video_size > MAX_BASE64_SIZE:
-                # Large file - upload to bucket instead of returning base64
-                logger.info(f"Video size {video_size / 1024 / 1024:.1f}MB exceeds threshold, uploading to bucket")
+            logger.info(f"Video output: {filename}, size: {video_size / 1024 / 1024:.1f}MB")
+            
+            if video_size > MAX_BASE64_SIZE and s3_client:
+                # Large file - upload to S3 and return URL
+                logger.info(f"Video size exceeds {MAX_BASE64_SIZE / 1024 / 1024:.0f}MB threshold, uploading to S3")
                 try:
                     # Decode and save to temp file
                     temp_video_path = f"/tmp/{filename}"
@@ -425,14 +469,29 @@ def process_job(job_input):
                     with open(temp_video_path, 'wb') as f:
                         f.write(b64.b64decode(video_data))
                     
-                    # Upload to RunPod bucket
-                    uploaded_url = rp_upload.upload_file_to_bucket(temp_video_path, bucket_creds=None)
-                    logger.info(f"Uploaded to bucket: {uploaded_url}")
+                    # Upload to S3
+                    s3_key = f"runpod-outputs/{filename}"
+                    s3_client.upload_file(
+                        temp_video_path,
+                        S3_BUCKET,
+                        s3_key,
+                        ExtraArgs={'ContentType': 'video/mp4'}
+                    )
+                    
+                    # Generate presigned URL (valid for 7 days)
+                    presigned_url = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': S3_BUCKET, 'Key': s3_key},
+                        ExpiresIn=604800  # 7 days
+                    )
+                    
+                    logger.info(f"Uploaded to S3: {s3_key}")
                     
                     media_outputs.append({
                         "filename": filename,
                         "type": "url",
-                        "url": uploaded_url,
+                        "url": presigned_url,
+                        "s3_key": s3_key,
                         "media_kind": "video"
                     })
                     
@@ -441,16 +500,17 @@ def process_job(job_input):
                         os.remove(temp_video_path)
                         
                 except Exception as upload_err:
-                    logger.error(f"Bucket upload failed: {upload_err}, falling back to base64")
-                    # Fallback to base64 if bucket upload fails
+                    logger.error(f"S3 upload failed: {upload_err}")
+                    # Can't fallback to base64 - it will exceed RunPod limit
+                    # Return error for this media
                     media_outputs.append({
                         "filename": filename,
-                        "type": "base64",
-                        "data": video_data,
+                        "type": "error",
+                        "error": f"Video too large ({video_size / 1024 / 1024:.1f}MB) and S3 upload failed: {upload_err}",
                         "media_kind": "video"
                     })
             else:
-                # Small file - return as base64 (faster)
+                # Small file - return as base64 (fits in RunPod payload)
                 media_outputs.append({
                     "filename": filename,
                     "type": "base64",
@@ -463,10 +523,15 @@ def process_job(job_input):
         logger.error(f"Workflow nodes checked: {list(videos.keys())}")
         return {"job_label": job_input.get("job_label"), "status": "failed", "errors": ["Video not found. The workflow did not produce any video output."]}
     
+    # Check if any outputs had errors
+    error_outputs = [m for m in media_outputs if m.get('type') == 'error']
+    if error_outputs and len(error_outputs) == len(media_outputs):
+        return {"job_label": job_input.get("job_label"), "status": "failed", "errors": [e.get('error') for e in error_outputs]}
+    
     return {
         "job_label": job_input.get("job_label"),
         "status": "completed",
-        "media": media_outputs
+        "media": [m for m in media_outputs if m.get('type') != 'error']
     }
 
 def handler(job):
