@@ -402,21 +402,66 @@ def process_job(job_input):
     finally:
         ws.close()
 
-    # 이미지가 없는 경우 처리
+    # Process video outputs
     media_outputs = []
+    MAX_BASE64_SIZE = 50 * 1024 * 1024  # 50MB threshold - upload to bucket if larger
+    
     for node_id in videos:
         if videos[node_id]:
             # Assuming single video per node for now
-            video_data = videos[node_id][0]
-            media_outputs.append({
-                "filename": f"{task_id}_{node_id}.mp4",
-                "type": "base64",
-                "data": video_data,
-                "media_kind": "video"
-            })
+            video_data = videos[node_id][0]  # This is base64 string
+            
+            # Calculate size of decoded data
+            video_size = len(video_data) * 3 // 4  # Approx decoded size
+            filename = f"{task_id}_{node_id}.mp4"
+            
+            if video_size > MAX_BASE64_SIZE:
+                # Large file - upload to bucket instead of returning base64
+                logger.info(f"Video size {video_size / 1024 / 1024:.1f}MB exceeds threshold, uploading to bucket")
+                try:
+                    # Decode and save to temp file
+                    temp_video_path = f"/tmp/{filename}"
+                    import base64 as b64
+                    with open(temp_video_path, 'wb') as f:
+                        f.write(b64.b64decode(video_data))
+                    
+                    # Upload to RunPod bucket
+                    uploaded_url = rp_upload.upload_file_to_bucket(temp_video_path, bucket_creds=None)
+                    logger.info(f"Uploaded to bucket: {uploaded_url}")
+                    
+                    media_outputs.append({
+                        "filename": filename,
+                        "type": "url",
+                        "url": uploaded_url,
+                        "media_kind": "video"
+                    })
+                    
+                    # Clean up temp file
+                    if os.path.exists(temp_video_path):
+                        os.remove(temp_video_path)
+                        
+                except Exception as upload_err:
+                    logger.error(f"Bucket upload failed: {upload_err}, falling back to base64")
+                    # Fallback to base64 if bucket upload fails
+                    media_outputs.append({
+                        "filename": filename,
+                        "type": "base64",
+                        "data": video_data,
+                        "media_kind": "video"
+                    })
+            else:
+                # Small file - return as base64 (faster)
+                media_outputs.append({
+                    "filename": filename,
+                    "type": "base64",
+                    "data": video_data,
+                    "media_kind": "video"
+                })
     
     if not media_outputs:
-        return {"job_label": job_input.get("job_label"), "status": "failed", "errors": ["비디오를 찾을 수 없습니다."]}
+        logger.error(f"No video output produced for job: {job_input.get('job_label')}")
+        logger.error(f"Workflow nodes checked: {list(videos.keys())}")
+        return {"job_label": job_input.get("job_label"), "status": "failed", "errors": ["Video not found. The workflow did not produce any video output."]}
     
     return {
         "job_label": job_input.get("job_label"),
