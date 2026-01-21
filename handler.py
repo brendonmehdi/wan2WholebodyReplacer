@@ -291,6 +291,21 @@ def process_job(job_input):
                 prompt["370"]["inputs"]["reference_image"] = ["311", 0]
                 logger.info("Face Crop disabled: Node 370 using original reference image (Node 311)")
 
+        # 8. Background Replacement Toggle
+        # When disabled, removes mask connections so only motion is copied (original background preserved)
+        replace_background = job_input.get("replace_background", True)  # Default ON for backward compat
+        if not replace_background:
+            logger.info("Background replacement DISABLED - removing mask connections")
+            if "370" in prompt:
+                # Remove connections to disable background/character replacement
+                if "background_video" in prompt["370"]["inputs"]:
+                    del prompt["370"]["inputs"]["background_video"]
+                if "character_mask" in prompt["370"]["inputs"]:
+                    del prompt["370"]["inputs"]["character_mask"]
+                logger.info("Removed background_video and character_mask from Node 370")
+        else:
+            logger.info("Background replacement ENABLED (default)")
+
     else:
         # Existing Logic for Wan2.2 / FLF2V
         workflow_file = "/new_Wan22_flf2v_api.json" if end_image_path_local else "/new_Wan22_api.json"
