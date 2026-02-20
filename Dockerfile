@@ -66,6 +66,11 @@ RUN cd /ComfyUI/custom_nodes && \
     if [ -f requirements.txt ]; then pip install -r requirements.txt; fi && \
     if [ -f requirements-no-cupy.txt ]; then pip install -r requirements-no-cupy.txt; fi
 
+# Pre-download RIFE model (GitHub sources return 404, so fetch from Hugging Face)
+RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife && \
+    wget -O /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/rife49.pth \
+    "https://huggingface.co/hfmaster/models-moved/resolve/main/rife/rife49.pth"
+
 RUN cd /ComfyUI/custom_nodes && \
     git clone https://github.com/rgthree/rgthree-comfy.git && \
     cd rgthree-comfy && \
